@@ -1,7 +1,9 @@
 import {
 	CredentialsHelper,
+	DatabaseType,
 	Db,
 	ExternalHooks,
+	GenericHelpers,
 	IExecutionDb,
 	IExecutionFlattedDb,
 	IPushDataExecutionFinished,
@@ -107,10 +109,20 @@ function pruneExecutionData(): void {
 
 		// throttle just on success to allow for self healing on failure
 		Db.collections.Execution!.delete({ stoppedAt: LessThanOrEqual(date.toISOString()) })
-		.then(data =>
-			setTimeout(() => {
-				throttling = false;
-			}, timeout * 1000)
+		.then(async () => {
+			const dbType = await GenericHelpers.getConfigValue('database.type') as DatabaseType;
+			if (dbType === 'sqlite') {
+				setTimeout(() => {
+					throttling = false;
+				}, timeout * 1000);
+				Db.collections.Execution!.query("VACUUM;");
+			} else {
+				setTimeout(() => {
+					throttling = false;
+				}, timeout * 1000);
+			}
+	
+		}
 		).catch(err => throttling = false);
 	}
 }
