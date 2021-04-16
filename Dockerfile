@@ -17,7 +17,7 @@ RUN apk --update add --virtual build-dependencies python build-base ca-certifica
 	apk del build-dependencies
 
 # Install fonts
-RUN apk --no-cache add --virtual fonts msttcorefonts-installer fontconfig && \
+RUN apk --no-cache add --virtual fonts msttcorefonts-installer fontconfig && \ 
 	update-ms-fonts && \
 	fc-cache -f && \
 	apk del fonts && \
