@@ -7,10 +7,12 @@ import {
 	INodeExecutionData,
 	INodeType,
 	INodeTypeDescription,
+	NodeOperationError,
 } from 'n8n-workflow';
 
 import {
 	apiRequestAllItems,
+	downloadRecordAttachments,
 } from './GenericFunctions';
 
 import * as moment from 'moment';
@@ -65,6 +67,28 @@ export class AirtableTrigger implements INodeType {
 				required: true,
 			},
 			{
+				displayName: 'Download Attachments',
+				name: 'downloadAttachments',
+				type: 'boolean',
+				default: false,
+				description: `When set to true the attachment fields define in 'Download Fields' will be downloaded.`,
+			},
+			{
+				displayName: 'Download Fields',
+				name: 'downloadFieldNames',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						downloadAttachments: [
+							true,
+						],
+					},
+				},
+				default: '',
+				description: `Name of the fields of type 'attachment' that should be downloaded. Multiple ones can be defined separated by comma. Case sensitive.`,
+			},
+			{
 				displayName: 'Additional Fields',
 				name: 'additionalFields',
 				type: 'collection',
@@ -100,6 +124,7 @@ export class AirtableTrigger implements INodeType {
 	};
 
 	async poll(this: IPollFunctions): Promise<INodeExecutionData[][] | null> {
+		const downloadAttachments = this.getNodeParameter('downloadAttachments', 0) as boolean;
 
 		const webhookData = this.getWorkflowStaticData('node');
 
@@ -146,7 +171,13 @@ export class AirtableTrigger implements INodeType {
 
 		if (Array.isArray(records) && records.length) {
 			if (this.getMode() === 'manual' && records[0].fields[triggerField] === undefined) {
-				throw new Error(`The Field "${triggerField}" does not exist.`);
+				throw new NodeOperationError(this.getNode(), `The Field "${triggerField}" does not exist.`);
+			}
+
+			if (downloadAttachments === true) {
+				const downloadFieldNames = (this.getNodeParameter('downloadFieldNames', 0) as string).split(',');
+				const data = await downloadRecordAttachments.call(this, records, downloadFieldNames);
+				return [data];
 			}
 
 			return [this.helpers.returnJsonArray(records)];

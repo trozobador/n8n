@@ -9,10 +9,11 @@ import {
 	INodePropertyOptions,
 	INodeType,
 	INodeTypeDescription,
+	NodeApiError,
+	NodeOperationError,
 } from 'n8n-workflow';
 
 import {
-	getErrors,
 	mauticApiRequest,
 	mauticApiRequestAllItems,
 	validateJSON,
@@ -180,6 +181,19 @@ export class Mautic implements INodeType {
 				}
 				return returnData;
 			},
+			// Get all the available contact fields to display them to user so that he can
+			// select them easily
+			async getContactFields(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+				const returnData: INodePropertyOptions[] = [];
+				const fields = await mauticApiRequestAllItems.call(this, 'fields', 'GET', '/fields/contact');
+				for (const field of fields) {
+					returnData.push({
+						name: field.label,
+						value: field.alias,
+					});
+				}
+				return returnData;
+			},
 		},
 	};
 
@@ -252,7 +266,7 @@ export class Mautic implements INodeType {
 						qs.start = 0;
 						responseData = await mauticApiRequest.call(this, 'GET', '/companies', {}, qs);
 						if (responseData.errors) {
-							throw new Error(getErrors(responseData));
+							throw new NodeApiError(this.getNode(), responseData);
 						}
 						responseData = responseData.companies;
 						responseData = Object.values(responseData);
@@ -293,7 +307,7 @@ export class Mautic implements INodeType {
 						if (json !== undefined) {
 							body = { ...json };
 						} else {
-							throw new Error('Invalid JSON');
+							throw new NodeOperationError(this.getNode(), 'Invalid JSON');
 						}
 					}
 					if (additionalFields.ipAddress) {
@@ -325,6 +339,13 @@ export class Mautic implements INodeType {
 							body.linkedin = socialMediaValues.linkedIn as string;
 							body.skype = socialMediaValues.skype as string;
 							body.twitter = socialMediaValues.twitter as string;
+						}
+					}
+					if (additionalFields.customFieldsUi) {
+						const customFields = (additionalFields.customFieldsUi as IDataObject).customFieldValues as IDataObject[];
+						if (customFields) {
+							const data = customFields.reduce((obj, value) => Object.assign(obj, { [`${value.fieldId}`]: value.fieldValue }), {});
+							Object.assign(body, data);
 						}
 					}
 					if (additionalFields.b2bOrb2c) {
@@ -395,7 +416,7 @@ export class Mautic implements INodeType {
 						if (json !== undefined) {
 							body = { ...json };
 						} else {
-							throw new Error('Invalid JSON');
+							throw new NodeOperationError(this.getNode(), 'Invalid JSON');
 						}
 					}
 					if (updateFields.ipAddress) {
@@ -427,6 +448,13 @@ export class Mautic implements INodeType {
 							body.linkedin = socialMediaValues.linkedIn as string;
 							body.skype = socialMediaValues.skype as string;
 							body.twitter = socialMediaValues.twitter as string;
+						}
+					}
+					if (updateFields.customFieldsUi) {
+						const customFields = (updateFields.customFieldsUi as IDataObject).customFieldValues as IDataObject[];
+						if (customFields) {
+							const data = customFields.reduce((obj, value) => Object.assign(obj, { [`${value.fieldId}`]: value.fieldValue }), {});
+							Object.assign(body, data);
 						}
 					}
 					if (updateFields.b2bOrb2c) {
@@ -497,7 +525,7 @@ export class Mautic implements INodeType {
 						qs.start = 0;
 						responseData = await mauticApiRequest.call(this, 'GET', '/contacts', {}, qs);
 						if (responseData.errors) {
-							throw new Error(getErrors(responseData));
+							throw new NodeApiError(this.getNode(), responseData);
 						}
 						responseData = responseData.contacts;
 						responseData = Object.values(responseData);
